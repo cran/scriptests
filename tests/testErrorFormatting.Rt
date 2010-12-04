@@ -1,0 +1,18 @@
+> # To make a non-interactive R session continue after stop() is called
+> # the error handler should be set to something other than the default NULL
+> # Error messages are printed with a line break after the call when the
+> # message is longer than a certain amount.  These tests identify that
+> # exact length.
+> options(error=function() NULL)
+> always.stop <- function(a, b, c, n) stop(substring(paste(rep(0:9,ceiling(n/10)), collapse="."), 1, n))
+> always.stop("a", "b", "c", 1)
+Error in always.stop("a", "b", "c", 1) : 0
+> always.stop("a", "b", "c", 31)
+Error in always.stop("a", "b", "c", 31) : 0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5
+> always.stop("a", "b", "c", 32)
+Error in always.stop("a", "b", "c", 32) : 
+  0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.
+> always.stop("a", "b", "c", 99)
+Error in always.stop("a", "b", "c", 99) : 
+  0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9
+> 

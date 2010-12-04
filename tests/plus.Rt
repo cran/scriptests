@@ -1,0 +1,8 @@
+> # plus() is defined in scriptests, but not exported
+> # to avoid unneccesary name conflicts.
+> scriptests:::plus(1, 1)
+[1] 2
+> scriptests:::plus(2, 
++ 2)
+[1] 4
+> 
