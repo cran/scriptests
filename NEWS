@@ -1,5 +1,17 @@
 SCRIPTESTS NEWS
 
+                CHANGES in scriptests version 1.0-8 (2011-08-20)
+    o   Minor fixes
+
+
+                CHANGES in scriptests version 1.0-6 (2011-06-28)
+    o   Bugfixes for do parsing continuation lines and separating one
+    	block from the next in transcripts.
+
+                CHANGES in scriptests version 1.0-5 (2011-03-18)
+    o   Two minor bugfixes to do with using full argument names and finding
+     	DESCRIPTION file.
+
                 CHANGES in scriptests version 1.0-4 (2011-02-24)
     o	When running under R CMD check, make the last 13 lines of the
     	fail file contain low level output (so that output of R CMD check
@@ -7,7 +19,8 @@ SCRIPTESTS NEWS
 	occurs.)
 
                 CHANGES in scriptests version 1.0-2 (2011-01-20)
-    o	Used full instead of abbreviated argument names in internal code at prompting of R CMD check
+    o	Used full instead of abbreviated argument names in internal code at
+    	prompting of R CMD check
 
                 CHANGES in scriptests version 1.0-1 (2011-01-11)
 
