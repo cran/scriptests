@@ -1,30 +1,55 @@
 source.pkg <- function(pkg.dir=getOption("scriptests.pkg.dir", "pkg"),
                        pattern=".*", suffix="\\.R$", dlls=c("no", "check", "build", "src"),
-                       pos=NA, all=FALSE, reset.function.envirs=TRUE,
-                       path=getOption("scriptests.pkg.path", default=getwd())) {
+                       unload=FALSE, pos=NA, all=FALSE, reset.function.envirs=TRUE,
+                       path=getOption("scriptests.pkg.path", default=getwd()),
+                       get.sccv=getOption('source.pkg.sccversion')) {
     if (!missing(dlls) && is.logical(dlls) && isTRUE(dlls))
         dlls <- "check"
     else
         dlls <- match.arg(dlls)
     if (is.null(pkg.dir))
         stop("pkg.dir is NULL")
-    if (regexpr("^(/|\\\\|[a-zA-Z]:)", pkg.dir) > 0)
+    if (regexpr("^(/|\\\\|[a-zA-Z]:)", pkg.dir) > 0) {
         pkg.dir.path <- pkg.dir
-    else
-        pkg.dir.path <- pkg.path(path, pkg.dir)
+        pkg.dir <- basename(pkg.dir)
+        path.used <- dirname(pkg.dir)
+    } else {
+        for (path.used in path.expand(strsplit(path, ';')[[1]])) {
+            pkg.dir.path <- pkg.path(path.used, pkg.dir)
+            if (file.exists(pkg.dir.path))
+                break
+        }
+    }
     if (!file.exists(pkg.dir.path))
         stop("cannot find package directory ", pkg.dir.path, " using path='", path, "'")
     if (!missing(pkg.dir))
         options("scriptests.pkg.dir"=pkg.dir)
     if (!missing(path))
         options("scriptests.pkg.path"=path)
-    desc <- NULL
+    desc <- list()
     if (file.exists(file.path(pkg.dir.path, "DESCRIPTION"))) {
         desc <- read.dcf(file.path(pkg.dir.path, "DESCRIPTION"))
         desc <- structure(as.list(as.character(desc[1,])), names=casefold(colnames(desc)))
     }
+    # Try to read the svn version number and store it in the description
+    if (!is.null(get.sccv)) {
+        sccversion <- try(system(paste(get.sccv, ' "', pkg.dir.path, '"', sep=''), intern=TRUE), silent=TRUE)
+        if (is(sccversion, 'try-error')) {
+            warning('Failed to run sccversion: ', paste(as.character(sccversion), collapse=' '))
+            sccversion <- 'sccfail'
+        } else if (!is.null(attr(sccversion, 'status'))) {
+            warning('sccversion returned an error: ', paste(as.character(sccversion), collapse=' '))
+            sccversion <- 'sccerror'
+        }
+    } else {
+        sccversion <- 'NA'
+    }
+    desc$sccversion <- sccversion
     pkg.name <- read.pkg.name(pkg.dir.path, pkg.dir)
     problems <- list()
+    cat('Loading R objects from package ', pkg.name, ' ', desc$version,
+        if (!is.element(desc$sccversion, c('NA','sccfail','sccerror'))) paste(' sccv=', desc$sccversion, sep=''),
+        '\n', sep='')
     # Load dependencies before we attach the environment for our package code, so that required
     # libraries come after in search path -- if the dependencies come before, we won't find them.
     if (!is.null(desc$depends)) {
@@ -53,7 +78,10 @@ source.pkg <- function(pkg.dir=getOption("scriptests.pkg.dir", "pkg"),
     oldpos <- match(paste("pkgcode", pkg.name, sep=":"), search())
     if (is.na(oldpos)) {
         # we do need to create a new one
+        # if we have a choice where to attach, do so before first package on search path
         if (is.na(pos))
+            pos <- min(grep('^(package|pkgcode):', search()))
+        if (!is.finite(pos))
             pos <- 2
         envir <- attach(NULL, pos=pos, name=paste("pkgcode", pkg.name, sep=":"))
     } else {
@@ -140,6 +168,8 @@ source.pkg <- function(pkg.dir=getOption("scriptests.pkg.dir", "pkg"),
             }
         }
     }
+    # Save the description
+    assign(".DESCRIPTION", value=desc, pos=pos)
 
     # Work out what data files to load (look for .rdata,
     # .rda, case insensitive) This does NOT cover the full
@@ -167,14 +197,17 @@ source.pkg <- function(pkg.dir=getOption("scriptests.pkg.dir", "pkg"),
         # <ARCH> is optionally taken from .Platform$r_arch
         dll.dir <- NULL
         dll.dirs <- getwd()
-        if (basename(path)!=pkg.name)
-            dll.dirs <- c(pkg.path(path, pkg.name), dll.dirs)
+        if (basename(path.used)!=pkg.name) {
+            dll.dirs <- c(pkg.path(path.used, pkg.name), dll.dirs)
+        }
         if (dlls=='check') {
             check.dirs <- paste(pkg.name, ".Rcheck", sep="")
             if (pkg.name != pkg.dir)
                 check.dirs <- c(check.dirs, paste(pkg.dir, ".Rcheck", sep=""))
         } else if (dlls=='build') {
             check.dirs <- getOption("source.build.dir", "build")
+            # If we have a path like ".../<pkgname>/pkg", look in ".../<pkgname>/build"
+            dll.dirs <- c(dirname(pkg.path(path.used, pkg.name)), dll.dirs)
         } else if (dlls=='src') {
             # Look in <pkg.dir>/src for dlls created by a command like
             # R CMD SHLIB --preclean pkg/src/somefile.c
@@ -188,6 +221,8 @@ source.pkg <- function(pkg.dir=getOption("scriptests.pkg.dir", "pkg"),
             if (length(.Platform$r_arch) && nchar(.Platform$r_arch)>0)
                 dll.dirs <- c(file.path(dll.dirs, .Platform$r_arch), dll.dirs)
         }
+        # make directory letters lower case
+        dll.dirs <- unique(gsub('^([A-Z]:)', '\\L\\1', dll.dirs, perl=TRUE))
         dll.dirs.orig <- dll.dirs
         if (any(i <- file.exists(dll.dirs))) {
             dll.dirs <- dll.dirs[i]
@@ -212,12 +247,15 @@ source.pkg <- function(pkg.dir=getOption("scriptests.pkg.dir", "pkg"),
         }
         if (!is.null(dll.dir)) {
             objfiles <- list.files(dll.dir, pattern=paste("*", .Platform$dynlib.ext, sep=""), ignore.case=TRUE)
+            dlls.fullpath <- file.path(dll.dir, objfiles)
+            allDLLPaths <- sapply(getLoadedDLLs(), function(x) x[['path']])
+            loadedDLLs <- normalizePath(allDLLPaths[file.exists(allDLLPaths)])
+            unloaded <- NULL
             if (length(objfiles)==0) {
                 cat("Looking for DLL/SO files, but did not find any", .Platform$dynlib.ext, "files in ", dll.dir, "\n", fill=TRUE)
             } else {
-                loadedDLLs <- normalizePath(sapply(unclass(getLoadedDLLs()), "[[", "path"))
-                for (dll in file.path(dll.dir, objfiles)) {
-                    # should make sure we have the full path for 'dll', because loadDLLs has full paths
+                for (dll in dlls.fullpath) {
+                    # should make sure we have the full path for 'dll', because loadedDLLs has full paths
                     if (is.element(normalizePath(dll), loadedDLLs)) {
                         cat("Attempting to unload DLL/SO", dll, "\n")
                         cat("Warning: this can be an unreliable operation on some systems\n")
@@ -228,17 +266,40 @@ source.pkg <- function(pkg.dir=getOption("scriptests.pkg.dir", "pkg"),
                             names(problem) <- paste("unloading", dll)
                             problems <- c(problems, problem)
                         }
+                        unloaded <- c(unloaded, dll)
                     }
-                    cat("Attempting to load DLL/SO", dll, "\n")
-                    res <- try(dyn.load(dll))
-                    if (is(res, "try-error")) {
-                        warning("failed to load", dll, ": ", res)
-                        problem <- list(as.character(res))
-                        names(problem) <- paste("loading", dll)
-                        problems <- c(problems, problem)
+                    if (!unload) {
+                        cat("Attempting to load DLL/SO", dll, "\n")
+                        res <- try(dyn.load(dll))
+                        if (is(res, "try-error")) {
+                            warning("failed to load", dll, ": ", res)
+                            problem <- list(as.character(res))
+                            names(problem) <- paste("loading", dll)
+                            problems <- c(problems, problem)
+                        }
                     }
                 }
             }
+            # if there are some loaded DLLs that don't exist on file, we still want to apply the unload to them
+            if (unload) {
+                pkgLoadedDLLs <- getLoadedDLLs()[[pkg.name]]
+                if (!is.null(pkgLoadedDLLs)) for (dll in pkgLoadedDLLs[['path']]) {
+                    if (! ( dll %in% unloaded)) {
+                        cat("Attempting to unload DLL/SO", dll, "\n")
+                        cat("Warning: this can be an unreliable operation on some systems\n")
+                        res <- try(dyn.unload(dll))
+                        if (is(res, "try-error")) {
+                            warning("failed to unload", dll, ": ", res)
+                            problem <- list(as.character(res))
+                            names(problem) <- paste("unloading", dll)
+                            problems <- c(problems, problem)
+                        }
+                        unloaded <- c(unloaded, dll)
+                    }
+                }
+            }
+            if (unload && length(unloaded)==0)
+                cat("Did not find any DLLs to unload (maybe they haven't been loaded yet)\n")
         }
     }
     invisible(problems[!sapply(problems, is.null)])

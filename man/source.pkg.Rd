@@ -4,11 +4,13 @@
 \title{ Quickly load code and data of a package }
 \description{
 
-  \code{source()} all of the source files and data files in a package into a specially created
-  environment.  It also loads DLLs if requested, and if those DLLs can
-  be found.   This function is intended for use in code development,
-  in situations where code from a package can be tested without worrying
-  about imports, namespaces, etc.
+  \code{source()} all of the source files and data files in a package
+  into an environment on the search path.  If an environment is not
+  already attached by a previous invocation of \code{source.pkg()}, one
+  will be created and attached.  It also loads DLLs if requested, and if
+  those DLLs can be found.  This function is intended for use in code
+  development, in situations where code from a package can be tested
+  without worrying about imports, namespaces, etc.
 
 }
 \usage{
@@ -16,9 +18,10 @@ source.pkg(pkg.dir = getOption("scriptests.pkg.dir", "pkg"),
            pattern = ".*",
            suffix = "\\\\.R$",
            dlls = c("no", "check", "build", "src"),
-           pos = NA, all = FALSE,
+           unload=FALSE, pos = NA, all = FALSE,
            reset.function.envirs=TRUE,
-           path=getOption("scriptests.pkg.path", default=getwd()))
+           path=getOption("scriptests.pkg.path", default=getwd()),
+           get.sccv=getOption('source.pkg.sccversion'))
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -36,11 +39,15 @@ source.pkg(pkg.dir = getOption("scriptests.pkg.dir", "pkg"),
       \item \code{check}: look in
     \code{<pkg.dir>.Rcheck/<pkg.name>/libs} and  \code{<pkg.name>.Rcheck/<pkg.name>/libs}
       \item \code{build}: look in the directory \code{build} (can be
-    created with \code{R CMD INSTALL -l build <package-tarball>})
+    created with \code{R CMD INSTALL -l build <package-tarball>}, and
+    before loading each time, it may be necessary to do
+    \code{dyn.unload(...)}, using the path of the DLL as printed.)
       }
   }
 
   \item{pos}{ Which environment on the search path to source R code into }
+
+  \item{unload}{ Should compiled object files be unloaded? }
 
   \item{all}{ If \code{TRUE}, all files matching the pattern and suffix
   are sourced, if \code{FALSE}, only files that have changed since last
@@ -51,7 +58,8 @@ source.pkg(pkg.dir = getOption("scriptests.pkg.dir", "pkg"),
   for explanation.}
 
   \item{path}{ The file system path to the directory in which the
-    package is located.  The initial default for \code{path} is the
+    package is located.  Can be a semi-colon separated list of paths.
+    The initial default for \code{path} is the
     current directory.  By default, R source files are looked for in the
     directory found by appending \code{pkg.dir} to \code{path}, i.e.
     \code{<path>/<pkg.dir>/R/*.R}. If \code{path} contains the string
@@ -60,6 +68,8 @@ source.pkg(pkg.dir = getOption("scriptests.pkg.dir", "pkg"),
     same value used as the default in subsequent invocations.
 
   }
+  \item{get.sccv}{ The name of the program that outputs the
+  source-code-control version number, e.g., for SVN, \code{svnversion}. }
 
 }
 \details{
@@ -114,7 +124,13 @@ source.pkg(pkg.dir = getOption("scriptests.pkg.dir", "pkg"),
   }
 }
 \value{
-  A list of the problems encountered when sourcing the files.
+
+  This function is executed for its side effects, which may include
+  attaching a new environment to the search path, or moving an existing
+  one, and reading function and object definitions into that
+  environment.  \code{source.pkg()} returns as its value a list of the
+  problems encountered when sourcing the files.
+
 }
 \note{
   If \code{reset.function.envirs=FALSE} is supplied, the environments on
@@ -128,10 +144,11 @@ source.pkg(pkg.dir = getOption("scriptests.pkg.dir", "pkg"),
 }
 \references{ \itemize{
     \item Similar ideas in an R-devel post by Barry Rowlingson:
-    \url{http://n4.nabble.com/Lightweight-package-idea-td924000.html#a924000}
+    \code{http://n4.nabble.com/Lightweight-package-idea-td924000.html#a924000}
+    (link no longer active)
     \item Hadley Wickham source_package() function
-    \url{http://gist.github.com/180883}, reads DESCRIPTION, loads dependencies, respects
-    collation order
+    \code{http://gist.github.com/180883}, reads DESCRIPTION, loads dependencies, respects
+    collation order (link no longer active)
   }
 }
 \author{ Tony Plate \email{tplate@acm.org} }

@@ -1,5 +1,8 @@
 SCRIPTESTS NEWS
 
+                CHANGES in scriptests version 1.0-12 (2013-07-20)
+    o   Allow path in source.pkg() and runtests() to be semi-colon separated list of paths
+
                 CHANGES in scriptests version 1.0-9 (2012-04-11)
     o   Use withVisible(eval(expr, envir)) instead of .Internal(eval.with.vis)
     	because the latter is not part of the official API.
@@ -19,7 +22,7 @@ SCRIPTESTS NEWS
                 CHANGES in scriptests version 1.0-4 (2011-02-24)
     o	When running under R CMD check, make the last 13 lines of the
     	fail file contain low level output (so that output of R CMD check
-	will contain low-level output instead of summaires when a failure
+	will contain low-level output instead of summaries when a failure
 	occurs.)
 
                 CHANGES in scriptests version 1.0-2 (2011-01-20)

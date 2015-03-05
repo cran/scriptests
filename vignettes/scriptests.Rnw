@@ -1,5 +1,6 @@
 \documentclass{article}
 \title{Creating a simple R package and unit tests with the scriptests package}
+%\VignetteIndexEntry{Using scriptests}
 \author{Tony Plate}
 \begin{document}
 \maketitle
@@ -118,6 +119,7 @@ doesn't understand namespaces, so if the package being
 loaded depends on namespaces, it won't work.)
 
 <<>>=
+library(scriptests)
 source.pkg(pkg="testpkg")
 # use pattern= to only run test files that match the pattern
 runtests(pkg="testpkg", pattern="plus")
