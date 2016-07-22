@@ -1,0 +1,9 @@
+
+Package: testpkg
+Version: 1.0-0
+License: GPL-3
+Description: A simple example of using scriptests for unit tests
+Title: Unit tests with scriptests
+Author: Joe Blow <joeblo@foobar.org>
+Maintainer: Joe Blow <joeblo@foobar.org>
+Suggests: scriptests
